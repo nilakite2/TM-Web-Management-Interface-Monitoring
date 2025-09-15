@@ -4,6 +4,10 @@ A single-file Flask web UI for running and supervising multiple **TrackMania For
 
 Includes Discord OAuth login, per-group admin permissions, live log streaming over WebSocket, one-click start/stop/restart, player-count widgets, and an automatic monitor that can self-heal or gracefully restart instances when empty.
 
+<p align="center">
+  <img src="dashboard.png" alt="TM Web UI – Dashboard" width="1200">
+</p>
+
 ---
 
 ## Table of Contents
