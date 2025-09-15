@@ -207,8 +207,11 @@ instances:
 ```
 ## Caddy
 Your Caddyfile can live where Caddy expects it (e.g. C:\caddy\Caddyfile).
+
 If you use **Cloudflare Origin Certificates** on the origin, ensure these files exist:
+
 C:\caddy\cf-origin.crt
+
 C:\caddy\cf-origin.key
 
 ## Caddy config
