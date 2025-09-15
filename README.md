@@ -71,18 +71,18 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 Place these in a folder (e.g. `WebUI/`):
 ```
 WebUI/
-app.py
-index.html
-servers.yaml
-.env
-requirements.txt
+|-> app.py
+|-> index.html
+|-> servers.yaml
+|-> .env
+|-> requirements.txt
 ```
 ---
 
 ## Installation
+```
 cd C:\Users\<USER>\Desktop\WebUI
 pip install -r requirements.txt
-```
 Flask==2.3.3
 flask-sock==0.7.0
 simple-websocket==0.10.1
@@ -98,61 +98,51 @@ Note: wexpect is optional and only used to pm2 attach to Trakman for interactive
 ## Configuration
 ## .env
 ```
-Path to instances/config
+# Copy to .env and fill in for local dev; in production set real env variables.
 SERVERS_YAML=servers.yaml
-
-Flask session
 SESSION_SECRET=please-change-me
-
-Discord OAuth
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
 OAUTH_REDIRECT_URL=http://localhost:8000/auth/callback
-
-Optional: webhook for monitor alerts
 DISCORD_WEBHOOK=
-
-Optional cookie domain (leave unset for automatic)
-SESSION_COOKIE_DOMAIN=.example.com
-
-Prefer https if you run behind a reverse proxy
+# Optional cookie domain (leave unset for automatic)
+# SESSION_COOKIE_DOMAIN=.example.com
 PREFERRED_URL_SCHEME=https
 ```
 ## servers.yaml
 ```
-Copy this template to servers.yaml. Do not commit secrets. Prefer using environment variables from .env where noted.
+# ========= Discord / App settings =========
+# COPY this file to servers.yaml (do NOT commit the real one).
+# use .env.example file for env variables.
 
-========= Discord / App settings =========
 settings:
-  Strong random string; override with env SESSION_SECRET in prod
+  # Strong random string; override with env SESSION_SECRET in prod
   session_secret: "change-me-dev-only"
-
-  Discord OAuth; can be left blank if provided via .env
+  # Discord OAuth; for dev you can keep these blank and use env vars instead
   discord_client_id: ""
   discord_client_secret: ""
-  For local dev; in prod set OAUTH_REDIRECT_URL env or here
+  # For local dev; in prod set OAUTH_REDIRECT_URL env or here
   oauth_redirect_url: "http://localhost:8000/auth/callback"
-
-  Optional: Discord webhook for monitor notifications (leave empty to disable)
+  # Optional: Discord webhook for monitor notifications (leave empty to disable)
   discord_webhook: ""
 
-  Optional tag shown by backend if you use XAseco slash sender
+  # Optional tag shown by backend if you use XAseco slash sender
   xaseco_slash_sender: ""
 
-  Global superadmins (Discord user IDs as strings)
+  # Global superadmins (Discord user IDs as strings)
   admin_discord_ids: []
 
-  Per-group instance admins (Discord user IDs)
+  # Per-group instance admins (Discord user IDs)
   group_admins: {}
 
-  Optional: who can SEE which groups (not admin rights)
+  # Optional: who can SEE which groups (not admin rights)
   user_groups: {}
 
-  ----- Monitor settings -----
+  # ----- Monitor settings -----
   monitor_refresh_seconds: 300
   monitor_state_file: "./monitor-flags.json"
 
-  ----- Trakman policy -----
+  # ----- Trakman policy -----
   trakman_restart_hours: 27
   trakman_player_check_minutes: 15
 
@@ -160,35 +150,25 @@ settings:
 php56: "C:\\xampp\\php56\\php.exe"
 
 instances:
-  --------- Example Trakman controller ----------
+  # --------- Example Trakman controller ----------
   - name: "Trakman_RPG"
     group: "group-a"
     type: "trakman"
-
-    Server process detection & start
     server_proc_name: "ExampleServer.exe"
     server_bat: "C:\\path\\to\\server\\StartServer.bat"
-
-    Trakman (pm2) controller
     trakman_dir: "C:\\path\\to\\trakman"
     pm2_name: "Trakman_RPG"
-
-    Logs (optional but recommended)
     server_log: "C:\\path\\to\\server\\Logs\\GameLog.txt"
     controller_log: "C:\\path\\to\\trakman\\logs\\combined.log"
-
-    Dedicated server XML-RPC
     xmlrpc_host: "127.0.0.1"
     xmlrpc_port: 5000
     xmlrpc_login: "SuperAdmin"
     xmlrpc_password: "CHANGE_ME"
     xmlrpc_path: "/RPC2"
 
-    Monitoring policy
     restart_after_hours: 27
     player_check_minutes: 15
 
-    Graceful restart sequence (Trakman)
     restart_pre_commands:
       - "//svms"
       - "//s"
@@ -198,21 +178,16 @@ instances:
     restart_post_commands:
       - "//kc"
 
-  --------- Example XAseco controller ----------
+  # --------- Example XAseco controller ----------
   - name: "XAseco_RPG"
     group: "group-b"
     type: "xaseco"
-
     server_proc_name: "ExampleXAseco.exe"
     server_bat: "C:\\path\\to\\xaseco\\Start.bat"
-
-    XAseco location and launch name
     xaseco_dir: "C:\\path\\to\\xaseco"
     xaseco_name: "XAseco_RPG"
-
     controller_log: "C:\\path\\to\\xaseco\\logfile.txt"
     server_log: "C:\\path\\to\\server\\Logs\\GameLog.txt"
-
     xmlrpc_host: "127.0.0.1"
     xmlrpc_port: 5001
     xmlrpc_login: "SuperAdmin"
@@ -222,7 +197,6 @@ instances:
     restart_after_hours: 27
     player_check_minutes: 15
 
-    Graceful restart sequence (XAseco)
     restart_chat_pre:
       - "/admin writetracklist"
       - "/admin writeabilities"
@@ -239,28 +213,34 @@ C:\caddy\cf-origin.key
 
 ## Caddy config
 ```
-yourdomain.tld {
-	encode zstd gzip
+www.example.com {
+    redir https://example.com{uri} permanent
+}
 
-	@nocache path_regexp nocache ^/(auth/.*|login)$
-	header @nocache Cache-Control "no-store"
+example.com {
+    # If terminating TLS here, supply cert/key paths or use `tls internal` for dev
+    # tls /path/to/cert.crt /path/to/key.key
+    encode zstd gzip
 
-	@home path /
-	header @home Cache-Control "no-store"
+    @nocache path_regexp nocache ^/(auth/.*|login)$
+    header @nocache Cache-Control "no-store"
 
-	reverse_proxy 127.0.0.1:8000 {
-		transport http {
-			versions 1.1
-		}
-		header_up X-Real-IP {remote}
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-Host {host}
-	}
+    @home path /
+    header @home Cache-Control "no-store"
+
+    reverse_proxy 127.0.0.1:8000 {
+        transport http {
+            versions 1.1
+        }
+        # If behind Cloudflare, pass the real client IP:
+        # header_up X-Real-IP {header.CF-Connecting-IP}
+        header_up X-Forwarded-Proto {scheme}
+    }
 }
 ```
 ## Running
 ## Development
-python app.py
+```python app.py```
 The app listens on http://0.0.0.0:8000. If using Caddy/HTTPS, browse to your domain.
 
 ## Production
