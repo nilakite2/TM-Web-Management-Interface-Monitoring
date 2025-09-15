@@ -1,0 +1,10 @@
+Flask==2.3.3
+flask-sock==0.7.0
+simple-websocket==0.10.1
+eventlet==0.33.3
+Authlib==1.3.0
+requests==2.32.3
+PyYAML==6.0.2
+psutil==5.9.8
+python-dotenv==1.0.1
+wexpect==4.0.0 ; sys_platform == "win32"

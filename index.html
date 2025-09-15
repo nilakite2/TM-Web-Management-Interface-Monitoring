@@ -1,0 +1,532 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>TM Server Dashboard</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <!-- Hard-disable caching -->
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <script>
+    // Force a unique URL on every visit so CDNs/browsers bypass cache
+    (function () {
+      const u = new URL(location.href);
+      if (!u.searchParams.has('t')) {
+        u.searchParams.set('t', Date.now());
+        location.replace(u.toString());
+      }
+    })();
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    body{font-family:system-ui,Segoe UI,Arial;margin:24px;background:#0b1220;color:#e6e9ef}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+    .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(360px,1fr))}
+    .card{background:#121a2b;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+    .row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+    .btns{display:flex;gap:6px;flex-wrap:wrap}
+    button{background:#2d6ae3;color:#fff;border:0;border-radius:10px;padding:8px 12px;cursor:pointer}
+    button.alt{background:#374151}
+    .ok{color:#22c55e}.bad{color:#ef4444}.warn{color:#f59e0b}
+    pre{background:#0a0f1a;color:#b8c1cc;height:200px;overflow:auto;padding:10px;border-radius:10px;white-space:pre-wrap}
+    a{color:#93c5fd}
+    small.muted{opacity:.7}
+    .group{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+    .group label{opacity:.85;margin-right:4px}
+    .sep{height:1px;background:#1a243a;margin:10px 0}
+    .console-input{width:100%;box-sizing:border-box;background:#0a0f1a;border:1px solid #1a243a;border-radius:8px;color:#e6e9ef;padding:8px}
+    .pill{font-size:12px;padding:4px 8px;border-radius:9999px;background:#1a243a}
+    .grow{flex:1 1 auto}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>TM Server Dashboard</h1>
+    <div style="display:flex;gap:12px;align-items:center">
+      <span class="pill" title="Next monitoring sweep">Next sweep: <b id="countdown">—</b></span>
+      <div id="auth"></div>
+    </div>
+  </header>
+  <div class="grid" id="grid"></div>
+
+<script>
+let AUTHED = false;
+let IS_ADMIN = false;   // superadmin flag (may be false for group-admins)
+let LOG_OPEN = false;   // pause auto-refresh while streaming logs/console
+
+function safeId(name){ return name.replace(/[^a-zA-Z0-9_-]/g,'_'); }
+
+// Cache-busting helper for GETs
+function noCache(url){
+  const u = new URL(url, location.origin);
+  u.searchParams.set('_', Date.now());
+  return u.pathname + u.search;
+}
+
+/* ---------------- Auth & status ---------------- */
+
+async function me(){
+  const r = await fetch(noCache('/api/me'), {credentials:'include', cache:'no-store'});
+  const j = await r.json();
+  const box = document.getElementById('auth');
+  AUTHED = !!j.authenticated;
+  IS_ADMIN = !!j.is_admin; // keep showing "(Admin)" for superadmins only
+  if(!AUTHED){
+    box.innerHTML = '<a href="/login"><button>Login with Discord</button></a>';
+  } else {
+    const u = j.user;
+    box.innerHTML = `<span>👤 ${u.username}#${u.discriminator} ${IS_ADMIN?'<span class="ok">(Admin)</span>':''}</span> <button class="alt" onclick="logout()">Logout</button>`;
+  }
+  return j;
+}
+async function logout(){
+  await fetch('/logout', {method:'POST', credentials:'include'});
+  location.reload();
+}
+async function status(){
+  const r = await fetch(noCache('/api/status'), {credentials:'include', cache:'no-store'});
+  return r.json();
+}
+
+/* ---------------- Server/controller controls ---------------- */
+
+async function control(action, name, target){
+  // Do NOT block on IS_ADMIN — group admins must be allowed. Server enforces per-instance.
+  const res = await fetch('/api/control', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify({ name, action, target })
+  });
+
+  if(res.status === 404){
+    if(target === 'both'){
+      await fetch('/api/' + action, {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body: JSON.stringify({ name })
+      });
+    } else {
+      alert('Backend missing /api/control for per-target actions.');
+    }
+  } else if(!res.ok){
+    const txt = await res.text().catch(()=>res.statusText);
+    alert('Error: ' + txt);
+  }
+
+  if(!LOG_OPEN) render();
+}
+
+function controlButtons(name, type, may_admin){
+  if(!may_admin) return '';
+  const serverGroup = `
+    <div class="group">
+      <label>Server:</label>
+      <button onclick="control('start','${name}','server')">Start</button>
+      <button class="alt" onclick="control('restart','${name}','server')">Restart</button>
+      <button class="alt" onclick="control('stop','${name}','server')">Stop</button>
+    </div>`;
+  const controllerGroup = `
+    <div class="group">
+      <label>Controller:</label>
+      <button onclick="control('start','${name}','controller')">Start</button>
+      <button class="alt" onclick="control('restart','${name}','controller')">Restart</button>
+      <button class="alt" onclick="control('stop','${name}','controller')">Stop</button>
+    </div>`;
+  const bothGroup = `
+    <div class="group">
+      <label>Both:</label>
+      <button onclick="control('start','${name}','both')">Start</button>
+      <button class="alt" onclick="control('restart','${name}','both')">Restart</button>
+      <button class="alt" onclick="control('stop','${name}','both')">Stop</button>
+    </div>`;
+  return `<div class="btns">${serverGroup}${controllerGroup}${bothGroup}</div>`;
+}
+
+/* ---------------- Monitoring ------------------- */
+let MONITOR = { refresh_seconds: 600, next_run_at: null, instances: [] };
+let COUNTDOWN_TIMER = null;
+
+function fmtCountdown(ms){
+  if(ms == null || ms < 0) return '—';
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  if(m > 0) return `${m}m ${r}s`;
+  return `${r}s`;
+}
+
+async function getMonitor(){
+  const r = await fetch(noCache('/api/monitor'), {credentials:'include', cache:'no-store'});
+  const j = await r.json();
+  MONITOR = j;
+  startCountdown();
+  return j;
+}
+
+function startCountdown(){
+  const el = document.getElementById('countdown');
+  if(!el) return;
+  if(COUNTDOWN_TIMER){ clearInterval(COUNTDOWN_TIMER); COUNTDOWN_TIMER = null; }
+
+  const nextISO = MONITOR?.next_run_at;
+  if(!nextISO){
+    el.textContent = '—';
+    return;
+  }
+  const target = new Date(nextISO).getTime();
+
+  const tick = () => {
+    const now = Date.now();
+    el.textContent = fmtCountdown(target - now);
+  };
+  tick();
+  COUNTDOWN_TIMER = setInterval(tick, 1000);
+}
+
+function isMonitored(name){
+  return !!(MONITOR.instances || []).find(x => x.name === name && x.enabled);
+}
+
+async function toggleMonitor(name, enabled){
+  // server enforces rights; UI only shows switch if may_admin
+  const res = await fetch('/api/monitor/toggle', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify({ name, enabled })
+  });
+  if(!res.ok){
+    const t = await res.text().catch(()=>res.statusText);
+    alert('Error: ' + t);
+  } else {
+    await getMonitor(); // refresh local model & countdown
+    if(!LOG_OPEN) render(); // re-render cards to reflect switch
+  }
+}
+
+/* ---------------- Log streaming ---------------- */
+
+function stopLive(preEl){
+  try{ preEl.ws && preEl.ws.close(); }catch(e){}
+  preEl.ws = null;
+  preEl.textContent += '\n[stopped]';
+  LOG_OPEN = false;
+}
+
+function liveLog(preEl, name, kind){
+  if(preEl.ws){ stopLive(preEl); }
+  if(!AUTHED){
+    preEl.textContent = 'Login required to view live logs.';
+    return;
+  }
+  LOG_OPEN = true;
+  preEl.textContent = 'connecting...\n';
+  const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const ws = new WebSocket(`${wsProto}://${location.host}/ws/log/${encodeURIComponent(name)}/${encodeURIComponent(kind)}?ts=${Date.now()}`);
+  preEl.ws = ws;
+
+  ws.onopen  = () => { preEl.textContent = 'connected.\n'; };
+  ws.onmessage = (e) => {
+    preEl.textContent += e.data + "\n";
+    preEl.scrollTop = preEl.scrollHeight;
+  };
+  ws.onerror = (e) => {
+    preEl.textContent += '\n[error]\n';
+    console.error('WS(log) error', e);
+  };
+  ws.onclose = (e) => {
+    preEl.textContent += `\n[closed code=${e.code} reason=${e.reason || '(none)'} clean=${e.wasClean}]\n`;
+    LOG_OPEN = false;
+  };
+}
+
+/* ---------------- XML-RPC helpers ---------------- */
+
+async function authenticateInstance(name){
+  // Do not block on IS_ADMIN; server enforces per-instance rights.
+  const id = safeId(name);
+  const pill = document.getElementById(`rpc-pill-${id}`);
+  if(pill){ pill.textContent = 'RPC: Working...'; pill.classList.remove('ok','bad'); }
+
+  const r = await fetch('/api/dedi/authenticate', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify({ name })
+  });
+
+  try{
+    const j = await r.json();
+    if(r.ok && j.ok && j.authenticated){
+      if(pill){ pill.textContent = 'RPC: Authenticated'; pill.classList.add('ok'); pill.classList.remove('bad'); }
+      alert('Authenticated ✅');
+    }else{
+      if(pill){ pill.textContent = 'RPC: Failed'; pill.classList.add('bad'); pill.classList.remove('ok'); }
+      alert('Authentication failed ❌ ' + (j.error || r.statusText));
+    }
+  }catch(e){
+    if(pill){ pill.textContent = 'RPC: Failed'; pill.classList.add('bad'); pill.classList.remove('ok'); }
+    alert('Bad response');
+  }
+}
+
+/* --- Send Chat (prompt & input variants) --- */
+
+async function chatSend(name){
+  const message = prompt('Message to everyone:');
+  if(!message) return;
+  await chatPost(name, message);
+}
+async function chatSendFromInput(name, inputId){
+  const el = document.getElementById(inputId);
+  if(!el) return;
+  const message = el.value.trim();
+  if(!message) return;
+  const ok = await chatPost(name, message);
+  if(ok) el.value = '';
+}
+async function chatPost(name, message){
+  const r = await fetch('/api/dedi/chatsend', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'include',
+    body: JSON.stringify({ name, message })
+  });
+  if(!r.ok){
+    const t = await r.text().catch(()=>r.statusText);
+    alert('Error: ' + t);
+    return false;
+  }else{
+    return true;
+  }
+}
+function chatEnterKey(name, inputId, ev){
+  if(ev.key === 'Enter'){ ev.preventDefault(); chatSendFromInput(name, inputId); }
+}
+async function quickCmd(name, text){
+  // Server enforces rights; UI hides for non-admins.
+  const ok = await chatPost(name, text);
+  if(!ok){ /* chatPost already alerted */ }
+}
+
+/* ---------------- Live player count (debounced, single poller) ---------------- */
+
+const PLAYER_POLL_MS = 180000; // 3 minutes
+let playersPollTimer = null;
+let playersPollInFlight = false;
+let playersPollStarted = false;
+
+// NEW: simple cache { [name]: { count: number, ts: ms since epoch } }
+const PLAYER_CACHE = Object.create(null);
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+async function refreshPlayerPills(){
+  if (playersPollInFlight) return;      // de-dupe
+  if (document.hidden) return;          // pause when tab is hidden
+  if (LOG_OPEN) return;                 // pause while viewing logs
+
+  const pills = Array.from(document.querySelectorAll('[data-player-pill="1"]'));
+  if (pills.length === 0) return;
+
+  playersPollInFlight = true;
+  try {
+    for (const pill of pills) {
+      const name = pill.getAttribute('data-name');
+      if (!name) continue;
+
+      // Do NOT overwrite with “…” — keep whatever was there (cached number or initial “—”)
+
+      try {
+        const r = await fetch('/api/playercount', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          credentials: 'include',
+          body: JSON.stringify({ name })
+        });
+        if (!r.ok) throw new Error(await r.text());
+        const j = await r.json();
+        const n = j.count ?? 0;
+
+        // update cache and pill
+        PLAYER_CACHE[name] = { count: n, ts: Date.now() };
+        pill.textContent = `Players: ${n}`;
+        pill.classList.toggle('warn', n > 0);
+        pill.title = `Updated just now`;
+      } catch {
+        // On error: keep showing the last known number if we have one; otherwise show “—”
+        const cached = PLAYER_CACHE[name];
+        if (cached) {
+          // leave pill.textContent and warn class as-is, but mark as stale
+          const ageSec = Math.floor((Date.now() - cached.ts) / 1000);
+          pill.title = `Last updated ${ageSec}s ago`;
+        } else {
+          pill.textContent = 'Players: —';
+          pill.classList.remove('warn');
+          pill.title = 'No data yet';
+        }
+      }
+
+      // stagger per instance to avoid burst
+      await sleep(750);
+    }
+  } finally {
+    playersPollInFlight = false;
+  }
+}
+
+function startPlayerPolling(){
+  if (playersPollStarted) return;       // start only once
+  playersPollStarted = true;
+
+  const jitter = Math.floor(Math.random() * 15000); // 0–15s jitter
+  // one gentle kickoff after first render
+  setTimeout(() => { if (!LOG_OPEN) refreshPlayerPills(); }, 3000 + jitter);
+  // steady cadence thereafter
+  playersPollTimer = setInterval(() => {
+    if (!LOG_OPEN) refreshPlayerPills();
+  }, PLAYER_POLL_MS);
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) refreshPlayerPills();
+});
+
+/* ---------------- Panels ---------------- */
+
+function logControls(s){
+  // Logs restricted to admins per server-side; hide UI if not admin
+  if(!s.may_admin) return '';
+  const hasAnyLog = s.server_log || s.controller_log;
+  if(!hasAnyLog) return '';
+  const serverBtn = s.server_log ? `<button class="alt" onclick="liveLog(this.parentElement.parentElement.nextElementSibling,'${s.name}','server')">Server</button>` : '';
+  const ctrlBtn   = s.controller_log ? `<button class="alt" onclick="liveLog(this.parentElement.parentElement.nextElementSibling,'${s.name}','controller')">Controller</button>` : '';
+  const stopBtn   = `<button class="alt" onclick="stopLive(this.parentElement.parentElement.nextElementSibling)">Stop</button>`;
+  return `<div class="row"><span>Live logs</span><div class="btns">${serverBtn}${ctrlBtn}${stopBtn}</div></div><pre>(click a button to start streaming)</pre>`;
+}
+
+function authPanel(s){
+  if(!s.may_admin) return '';
+  const id = safeId(s.name);
+  return `
+    <div class="row">
+      <span>Server Commands <span id="rpc-pill-${id}" class="pill">RPC</span></span>
+      <div class="btns">
+        <button onclick="authenticateInstance('${s.name}')">Authenticate</button>
+        <button class="alt" onclick="chatSend('${s.name}')">Send Chat</button>
+      </div>
+    </div>
+  `;
+}
+
+function monitorToggleRow(s){
+  if(!s.may_admin) return ''; // only instance admins can toggle
+  const checked = isMonitored(s.name) ? 'checked' : '';
+  return `
+    <div class="row">
+      <span>Monitoring</span>
+      <label class="btns" style="align-items:center;gap:8px">
+        <input type="checkbox" ${checked}
+               onchange="toggleMonitor('${s.name}', this.checked)"
+               style="width:18px;height:18px;cursor:pointer"/>
+        <span class="pill">${checked ? 'Enabled' : 'Disabled'}</span>
+      </label>
+    </div>
+  `;
+}
+
+/* --- inline Send Chat panel --- */
+function chatInputPanel(s){
+  if(!s.may_admin) return '';
+  const id = safeId(s.name);
+  return `
+    <div class="row"><span>Send Chat</span></div>
+    <div class="row" style="gap:8px;align-items:center">
+      <input id="chat-${id}" class="console-input grow"
+             placeholder="Type message to everyone"
+             onkeydown="chatEnterKey('${s.name}','chat-${id}', event)"/>
+      <button class="alt" onclick="chatSendFromInput('${s.name}','chat-${id}')">Send</button>
+    </div>
+  `;
+}
+
+/* --- Quick Admin shortcuts --- */
+function quickAdminPanel(s){
+  if(!s.may_admin) return '';
+  if(s.type === 'trakman') return '';
+  return `
+    <div class="row"><span>Quick Admin Commands</span></div>
+    <div class="btns">
+      <button class="alt" onclick="quickCmd('${s.name}','/admin writetracklist')">Write Tracklist</button>
+      <button class="alt" onclick="quickCmd('${s.name}','/admin writeabilities')">Write Abilities</button>
+      <button class="alt" onclick="quickCmd('${s.name}','/admin skip')">Skip</button>
+    </div>
+  `;
+}
+
+/* ---------------- Render ---------------- */
+
+async function render(){
+  const data = await status();
+  const grid = document.getElementById('grid');
+  if(LOG_OPEN) return;
+  grid.innerHTML = '';
+  for (const s of data){
+    const c = document.createElement('div'); c.className = 'card';
+    const srvLine = `Server: <b class="${s.server_alive?'ok':'bad'}">${s.server_alive?'Running':'Stopped'}</b>`
+      + (s.may_admin && s.server_log ? ` — <a href="/api/log/${encodeURIComponent(s.name)}/server?ts=${Date.now()}" target="_blank">log</a>` : '');
+    const ctrlLine = `Controller: <b class="${s.controller_alive?'ok':'bad'}">${s.controller_alive?'Running':'Stopped'}</b>`
+      + (s.may_admin && s.controller_log ? ` — <a href="/api/log/${encodeURIComponent(s.name)}/controller?ts=${Date.now()}" target="_blank">log</a>` : '');
+
+    const id = safeId(s.name);
+
+    // NEW: use cached player count on render (no flicker)
+    const cached = PLAYER_CACHE[s.name];
+    const cachedCount = cached ? cached.count : null;
+    const warnCls = cachedCount > 0 ? ' warn' : '';
+    const ageTitle = cached
+      ? `Last updated ${Math.floor((Date.now() - cached.ts)/1000)}s ago`
+      : 'No data yet';
+
+    c.innerHTML = `
+      <div class="row">
+        <h2>${s.name} <small class="muted">(${s.type}${s.group ? ' • ' + s.group : ''})</small></h2>
+      </div>
+      <p>${srvLine}</p>
+      <p>${ctrlLine}</p>
+
+      <div class="row">
+        <span class="pill${warnCls}" data-player-pill="1" data-name="${s.name}"
+              id="pill-players-${id}" title="${ageTitle}">
+          Players: ${cachedCount ?? '—'}
+        </span>
+      </div>
+
+      ${monitorToggleRow(s)}
+      <div class="sep"></div>
+      ${controlButtons(s.name, s.type, s.may_admin)}
+      <div class="sep"></div>
+      ${logControls(s)}
+      <div class="sep"></div>
+      ${authPanel(s)}
+      <div class="sep"></div>
+      ${chatInputPanel(s)}
+      ${s.type!=='trakman' ? '<div class="sep"></div>' + quickAdminPanel(s) : ''}
+    `;
+    grid.appendChild(c);
+  }
+}
+
+(async function boot(){
+  await Promise.all([getMonitor(), me()]);
+  await render();
+  await refreshPlayerPills();
+  startPlayerPolling();
+  setInterval(()=>{ if(!LOG_OPEN) render(); }, 5000);
+})();
+</script>
+</body>
+</html>

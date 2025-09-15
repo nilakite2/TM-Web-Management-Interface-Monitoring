@@ -1,0 +1,93 @@
+# ========= Discord / App settings =========
+# COPY this file to servers.yaml (do NOT commit the real one).
+# use .env.example file for env variables.
+
+settings:
+  # Strong random string; override with env SESSION_SECRET in prod
+  session_secret: "change-me-dev-only"
+  # Discord OAuth; for dev you can keep these blank and use env vars instead
+  discord_client_id: ""
+  discord_client_secret: ""
+  # For local dev; in prod set OAUTH_REDIRECT_URL env or here
+  oauth_redirect_url: "http://localhost:8000/auth/callback"
+  # Optional: Discord webhook for monitor notifications (leave empty to disable)
+  discord_webhook: ""
+
+  # Optional tag shown by backend if you use XAseco slash sender
+  xaseco_slash_sender: ""
+
+  # Global superadmins (Discord user IDs as strings)
+  admin_discord_ids: []
+
+  # Per-group instance admins (Discord user IDs)
+  group_admins: {}
+
+  # Optional: who can SEE which groups (not admin rights)
+  user_groups: {}
+
+  # ----- Monitor settings -----
+  monitor_refresh_seconds: 300
+  monitor_state_file: "./monitor-flags.json"
+
+  # ----- Trakman policy -----
+  trakman_restart_hours: 27
+  trakman_player_check_minutes: 15
+
+# Optional: path to PHP 5.6 if you launch XAseco via php.exe directly
+php56: "C:\\xampp\\php56\\php.exe"
+
+instances:
+  # --------- Example Trakman controller ----------
+  - name: "Trakman_RPG"
+    group: "group-a"
+    type: "trakman"
+    server_proc_name: "ExampleServer.exe"
+    server_bat: "C:\\path\\to\\server\\StartServer.bat"
+    trakman_dir: "C:\\path\\to\\trakman"
+    pm2_name: "Trakman_RPG"
+    server_log: "C:\\path\\to\\server\\Logs\\GameLog.txt"
+    controller_log: "C:\\path\\to\\trakman\\logs\\combined.log"
+    xmlrpc_host: "127.0.0.1"
+    xmlrpc_port: 5000
+    xmlrpc_login: "SuperAdmin"
+    xmlrpc_password: "CHANGE_ME"
+    xmlrpc_path: "/RPC2"
+
+    restart_after_hours: 27
+    player_check_minutes: 15
+
+    restart_pre_commands:
+      - "//svms"
+      - "//s"
+      - "//sd"
+    restart_wait_before_start: 5
+    restart_wait_after_start: 30
+    restart_post_commands:
+      - "//kc"
+
+  # --------- Example XAseco controller ----------
+  - name: "XAseco_RPG"
+    group: "group-b"
+    type: "xaseco"
+    server_proc_name: "ExampleXAseco.exe"
+    server_bat: "C:\\path\\to\\xaseco\\Start.bat"
+    xaseco_dir: "C:\\path\\to\\xaseco"
+    xaseco_name: "XAseco_RPG"
+    controller_log: "C:\\path\\to\\xaseco\\logfile.txt"
+    server_log: "C:\\path\\to\\server\\Logs\\GameLog.txt"
+    xmlrpc_host: "127.0.0.1"
+    xmlrpc_port: 5001
+    xmlrpc_login: "SuperAdmin"
+    xmlrpc_password: "CHANGE_ME"
+    xmlrpc_path: "/RPC2"
+
+    restart_after_hours: 27
+    player_check_minutes: 15
+
+    restart_chat_pre:
+      - "/admin writetracklist"
+      - "/admin writeabilities"
+      - "/admin skip"
+    restart_wait_before_shutdown: 60
+    shutdown_command: "/admin shutdownall"
+    restart_wait_after_start: 30

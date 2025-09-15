@@ -1,0 +1,24 @@
+www.example.com {
+    redir https://example.com{uri} permanent
+}
+
+example.com {
+    # If terminating TLS here, supply cert/key paths or use `tls internal` for dev
+    # tls /path/to/cert.crt /path/to/key.key
+    encode zstd gzip
+
+    @nocache path_regexp nocache ^/(auth/.*|login)$
+    header @nocache Cache-Control "no-store"
+
+    @home path /
+    header @home Cache-Control "no-store"
+
+    reverse_proxy 127.0.0.1:8000 {
+        transport http {
+            versions 1.1
+        }
+        # If behind Cloudflare, pass the real client IP:
+        # header_up X-Real-IP {header.CF-Connecting-IP}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
