@@ -69,20 +69,20 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 ## Folder Layout
 
 Place these in a folder (e.g. `WebUI/`):
-
+```
 WebUI/
 app.py
 index.html
 servers.yaml
 .env
 requirements.txt
-
+```
 ---
 
 ## Installation
 cd C:\Users\<USER>\Desktop\WebUI
 pip install -r requirements.txt
-
+```
 Flask==2.3.3
 flask-sock==0.7.0
 simple-websocket==0.10.1
@@ -94,9 +94,10 @@ psutil==5.9.8
 python-dotenv==1.0.1
 wexpect==4.0.0 ; sys_platform == "win32"
 Note: wexpect is optional and only used to pm2 attach to Trakman for interactive //... commands on Windows.
-
+```
 ## Configuration
 ## .env
+```
 Path to instances/config
 SERVERS_YAML=servers.yaml
 
@@ -116,8 +117,9 @@ SESSION_COOKIE_DOMAIN=.example.com
 
 Prefer https if you run behind a reverse proxy
 PREFERRED_URL_SCHEME=https
-
+```
 ## servers.yaml
+```
 Copy this template to servers.yaml. Do not commit secrets. Prefer using environment variables from .env where noted.
 
 ========= Discord / App settings =========
@@ -228,7 +230,7 @@ instances:
     restart_wait_before_shutdown: 60
     shutdown_command: "/admin shutdownall"
     restart_wait_after_start: 30
-
+```
 ## Caddy
 Your Caddyfile can live where Caddy expects it (e.g. C:\caddy\Caddyfile).
 If you use **Cloudflare Origin Certificates** on the origin, ensure these files exist:
@@ -236,6 +238,7 @@ C:\caddy\cf-origin.crt
 C:\caddy\cf-origin.key
 
 ## Caddy config
+```
 yourdomain.tld {
 	encode zstd gzip
 
@@ -254,6 +257,7 @@ yourdomain.tld {
 		header_up X-Forwarded-Host {host}
 	}
 }
+```
 ## Running
 ## Development
 python app.py
