@@ -28,7 +28,7 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 
 ---
 
-## Features
+# Features
 
 - ✅ **Dashboard** of all instances (server + controller status, logs, player count)
 - 🔐 **Discord OAuth** login with superadmin & per-group admin access
@@ -44,7 +44,7 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 
 ---
 
-## Tested With
+# Tested With
 
 - **Trakman**: 1.6.1 (Node + pm2)
 - **XAseco**: 1.16 (PHP 5.6 + modernizer/mysqli)
@@ -53,7 +53,7 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 
 ---
 
-## Prerequisites
+# Prerequisites
 
 - **TrackMania Dedicated Server**  
   Download: http://tm.cloudzor.ch/tmnf/TrackmaniaServer_2011-02-21.zip  
@@ -66,7 +66,7 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 
 ---
 
-## Folder Layout
+# Folder Layout
 
 Place these in a folder (e.g. `WebUI/`):
 ```
@@ -79,7 +79,7 @@ WebUI/
 ```
 ---
 
-## Installation
+# Installation
 ```
 cd C:\Users\<USER>\Desktop\WebUI
 pip install -r requirements.txt
@@ -95,8 +95,8 @@ python-dotenv==1.0.1
 wexpect==4.0.0 ; sys_platform == "win32"
 Note: wexpect is optional and only used to pm2 attach to Trakman for interactive //... commands on Windows.
 ```
-## Configuration
-# .env
+# Configuration
+## .env
 ```
 # Copy to .env and fill in for local dev; in production set real env variables.
 SERVERS_YAML=servers.yaml
@@ -109,7 +109,7 @@ DISCORD_WEBHOOK=
 # SESSION_COOKIE_DOMAIN=.example.com
 PREFERRED_URL_SCHEME=https
 ```
-# servers.yaml
+## servers.yaml
 ```
 # ========= Discord / App settings =========
 # COPY this file to servers.yaml (do NOT commit the real one).
@@ -205,7 +205,7 @@ instances:
     shutdown_command: "/admin shutdownall"
     restart_wait_after_start: 30
 ```
-## Caddy
+# Caddy
 Your Caddyfile can live where Caddy expects it (e.g. C:\caddy\Caddyfile).
 
 If you use **Cloudflare Origin Certificates** on the origin, ensure these files exist:
@@ -214,7 +214,7 @@ C:\caddy\cf-origin.crt
 
 C:\caddy\cf-origin.key
 
-# Caddy config
+## Caddy config
 ```
 www.example.com {
     redir https://example.com{uri} permanent
@@ -241,8 +241,8 @@ example.com {
     }
 }
 ```
-## Running
-# Development
+# Running
+## Development
 python app.py
 
 The app listens on http://0.0.0.0:8000. If using Caddy/HTTPS, browse to your domain.
@@ -252,7 +252,7 @@ Keep app.py, .env, and servers.yaml together as the working directory.
 
 Run under a Windows service manager (e.g., NSSM) and place Caddy in front for TLS.
 
-# Using the Web UI
+## Using the Web UI
 Visit your domain.
 
 Click Login with Discord.
@@ -273,7 +273,7 @@ Plain text broadcasts via ChatSend
 
 XAseco: /admin ... via ChatSend
 
-# Permissions Model
+## Permissions Model
 Superadmins (settings.admin_discord_ids) manage everything.
 
 Group admins (settings.group_admins.<group>) manage instances in that group.
@@ -282,7 +282,7 @@ user_groups controls visibility only (what users can see).
 
 Permissions are enforced on every API call; the UI also hides buttons where possible.
 
-# Monitoring Details
+## Monitoring Details
 Cadence: settings.monitor_refresh_seconds (default 300s).
 
 Per-instance “monitoring enabled” is persisted to monitor-flags.json (path in settings).
@@ -300,7 +300,7 @@ XAseco: send /admin pre-commands → /admin shutdownall → restart server & con
 
 Discord webhook alerts announce outages/recoveries; optional mentions via MENTION_TEXT.
 
-# HTTP & WS Endpoints
+## HTTP & WS Endpoints
 GET / — UI
 
 GET /api/me — auth state
@@ -325,7 +325,7 @@ POST /api/dedi/authenticate — test XML-RPC auth
 
 WS /ws/log/<name>/<server|controller> — live tail via WebSocket
 
-## Troubleshooting
+# Troubleshooting
 Login succeeds but you appear logged out
 
 Check SESSION_COOKIE_DOMAIN (for https://example.com, use .example.com) and PREFERRED_URL_SCHEME=https.
@@ -355,7 +355,7 @@ Logs not visible
 
 Check server_log / controller_log paths and read permissions for the Python process.
 
-## Security Notes
+# Security Notes
 Do not commit .env or real passwords in servers.yaml.
 
 Limit who can access the site until admin lists are set.
@@ -364,7 +364,7 @@ Consider running the Python process under a restricted Windows account.
 
 Put an HTTPS proxy (Caddy/Cloudflare) in front if exposed publicly.
 
-## Quick Start
+# Quick Start
 Install prerequisites (Python, PHP 5.6 for XAseco, Node + pm2 for Trakman).
 
 Prepare and test your dedicated servers + controllers.
