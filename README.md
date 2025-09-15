@@ -96,7 +96,7 @@ wexpect==4.0.0 ; sys_platform == "win32"
 Note: wexpect is optional and only used to pm2 attach to Trakman for interactive //... commands on Windows.
 ```
 ## Configuration
-## .env
+# .env
 ```
 # Copy to .env and fill in for local dev; in production set real env variables.
 SERVERS_YAML=servers.yaml
@@ -109,7 +109,7 @@ DISCORD_WEBHOOK=
 # SESSION_COOKIE_DOMAIN=.example.com
 PREFERRED_URL_SCHEME=https
 ```
-## servers.yaml
+# servers.yaml
 ```
 # ========= Discord / App settings =========
 # COPY this file to servers.yaml (do NOT commit the real one).
@@ -214,7 +214,7 @@ C:\caddy\cf-origin.crt
 
 C:\caddy\cf-origin.key
 
-## Caddy config
+# Caddy config
 ```
 www.example.com {
     redir https://example.com{uri} permanent
@@ -242,7 +242,7 @@ example.com {
 }
 ```
 ## Running
-## Development
+# Development
 python app.py
 
 The app listens on http://0.0.0.0:8000. If using Caddy/HTTPS, browse to your domain.
@@ -252,7 +252,7 @@ Keep app.py, .env, and servers.yaml together as the working directory.
 
 Run under a Windows service manager (e.g., NSSM) and place Caddy in front for TLS.
 
-## Using the Web UI
+# Using the Web UI
 Visit your domain.
 
 Click Login with Discord.
@@ -273,7 +273,7 @@ Plain text broadcasts via ChatSend
 
 XAseco: /admin ... via ChatSend
 
-## Permissions Model
+# Permissions Model
 Superadmins (settings.admin_discord_ids) manage everything.
 
 Group admins (settings.group_admins.<group>) manage instances in that group.
@@ -282,7 +282,7 @@ user_groups controls visibility only (what users can see).
 
 Permissions are enforced on every API call; the UI also hides buttons where possible.
 
-## Monitoring Details
+# Monitoring Details
 Cadence: settings.monitor_refresh_seconds (default 300s).
 
 Per-instance “monitoring enabled” is persisted to monitor-flags.json (path in settings).
@@ -300,7 +300,7 @@ XAseco: send /admin pre-commands → /admin shutdownall → restart server & con
 
 Discord webhook alerts announce outages/recoveries; optional mentions via MENTION_TEXT.
 
-## HTTP & WS Endpoints
+# HTTP & WS Endpoints
 GET / — UI
 
 GET /api/me — auth state
@@ -372,5 +372,7 @@ Prepare and test your dedicated servers + controllers.
 Put app.py, index.html, servers.yaml, .env, and requirements.txt in WebUI/.
 
 pip install -r requirements.txt
+
 python app.py
+
 (Optional) Enable Caddy and visit your HTTPS domain.
