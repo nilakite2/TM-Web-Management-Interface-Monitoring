@@ -243,87 +243,134 @@ example.com {
 ```
 ## Running
 ## Development
-```python app.py```
+python app.py
+
 The app listens on http://0.0.0.0:8000. If using Caddy/HTTPS, browse to your domain.
 
 ## Production
 Keep app.py, .env, and servers.yaml together as the working directory.
+
 Run under a Windows service manager (e.g., NSSM) and place Caddy in front for TLS.
 
 ## Using the Web UI
 Visit your domain.
+
 Click Login with Discord.
+
 Each instance card shows:
+
 Server & controller status with log links (if you’re an admin for that instance)
+
 Monitoring toggle
+
 Start / Restart / Stop for Server, Controller, or Both
+
 Send Chat input
+
 Trakman: //... runs in Trakman console (pm2 attach)
+
 Plain text broadcasts via ChatSend
+
 XAseco: /admin ... via ChatSend
 
 ## Permissions Model
 Superadmins (settings.admin_discord_ids) manage everything.
+
 Group admins (settings.group_admins.<group>) manage instances in that group.
+
 user_groups controls visibility only (what users can see).
+
 Permissions are enforced on every API call; the UI also hides buttons where possible.
 
 ## Monitoring Details
 Cadence: settings.monitor_refresh_seconds (default 300s).
+
 Per-instance “monitoring enabled” is persisted to monitor-flags.json (path in settings).
 
 Per instance:
 restart_after_hours: uptime threshold before considering a restart
+
 player_check_minutes: minimum interval between checks
 
 If empty at check time:
+
 Trakman: pre-commands → server start → post-commands (defaults: //svms, //s, //sd, wait, start, wait, //kc)
+
 XAseco: send /admin pre-commands → /admin shutdownall → restart server & controller
+
 Discord webhook alerts announce outages/recoveries; optional mentions via MENTION_TEXT.
 
 ## HTTP & WS Endpoints
 GET / — UI
+
 GET /api/me — auth state
+
 GET /api/status — status for all instances
+
 POST /api/control — {name, action: start|stop|restart, target: server|controller|both}
+
 GET /api/log/<name>/<server|controller> — raw log download/stream
+
 GET /api/monitor — monitor info + next sweep ETA
+
 POST /api/monitor/toggle — enable/disable monitoring per instance
+
 POST /api/monitor/force — force a notification sweep (superadmin only)
+
 POST /api/playercount — live player count (tiny TTL cache)
+
 POST /api/dedi/chatsend — send chat / run command (permission-checked)
+
 POST /api/dedi/authenticate — test XML-RPC auth
+
 WS /ws/log/<name>/<server|controller> — live tail via WebSocket
 
 ## Troubleshooting
 Login succeeds but you appear logged out
+
 Check SESSION_COOKIE_DOMAIN (for https://example.com, use .example.com) and PREFERRED_URL_SCHEME=https.
 
+
 WebSockets fail behind proxy/CDN
+
 Ensure HTTP/1.1 and WS upgrades are allowed (Caddy config above works).
 
+
 “GBXRemote 2” errors on XML-RPC
+
 The app auto-falls back to GBX binary calls when it detects GBXRemote on the other side.
 
+
 Trakman // commands don’t execute
+
 Confirm pm2 is installed, pm2_name matches, and wexpect is installed on Windows.
 
+
 Player count shows zero/unavailable
+
 Verify XML-RPC credentials and port match your dedicated server config.
 
+
 Logs not visible
+
 Check server_log / controller_log paths and read permissions for the Python process.
 
 ## Security Notes
 Do not commit .env or real passwords in servers.yaml.
+
 Limit who can access the site until admin lists are set.
+
 Consider running the Python process under a restricted Windows account.
+
 Put an HTTPS proxy (Caddy/Cloudflare) in front if exposed publicly.
 
 ## Quick Start
 Install prerequisites (Python, PHP 5.6 for XAseco, Node + pm2 for Trakman).
+
 Prepare and test your dedicated servers + controllers.
+
 Put app.py, index.html, servers.yaml, .env, and requirements.txt in WebUI/.
+
 pip install -r requirements.txt
 python app.py
 (Optional) Enable Caddy and visit your HTTPS domain.
