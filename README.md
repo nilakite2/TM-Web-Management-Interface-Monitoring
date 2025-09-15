@@ -71,11 +71,11 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 Place these in a folder (e.g. `WebUI/`):
 
 WebUI/
-├─ app.py
-├─ index.html
-├─ servers.yaml
-├─ .env
-└─ requirements.txt
+app.py
+index.html
+servers.yaml
+.env
+requirements.txt
 
 ---
 
@@ -97,59 +97,60 @@ Note: wexpect is optional and only used to pm2 attach to Trakman for interactive
 
 ## Configuration
 ## .env
-# Path to instances/config
+Path to instances/config
 SERVERS_YAML=servers.yaml
 
-# Flask session
+Flask session
 SESSION_SECRET=please-change-me
 
-# Discord OAuth
+Discord OAuth
 DISCORD_CLIENT_ID=
 DISCORD_CLIENT_SECRET=
 OAUTH_REDIRECT_URL=http://localhost:8000/auth/callback
 
-# Optional: webhook for monitor alerts
+Optional: webhook for monitor alerts
 DISCORD_WEBHOOK=
 
-# Optional cookie domain (leave unset for automatic)
-# SESSION_COOKIE_DOMAIN=.example.com
+Optional cookie domain (leave unset for automatic)
+SESSION_COOKIE_DOMAIN=.example.com
 
-# Prefer https if you run behind a reverse proxy
+Prefer https if you run behind a reverse proxy
 PREFERRED_URL_SCHEME=https
-servers.yaml
+
+## servers.yaml
 Copy this template to servers.yaml. Do not commit secrets. Prefer using environment variables from .env where noted.
 
-# ========= Discord / App settings =========
+========= Discord / App settings =========
 settings:
-  # Strong random string; override with env SESSION_SECRET in prod
+  Strong random string; override with env SESSION_SECRET in prod
   session_secret: "change-me-dev-only"
 
-  # Discord OAuth; can be left blank if provided via .env
+  Discord OAuth; can be left blank if provided via .env
   discord_client_id: ""
   discord_client_secret: ""
-  # For local dev; in prod set OAUTH_REDIRECT_URL env or here
+  For local dev; in prod set OAUTH_REDIRECT_URL env or here
   oauth_redirect_url: "http://localhost:8000/auth/callback"
 
-  # Optional: Discord webhook for monitor notifications (leave empty to disable)
+  Optional: Discord webhook for monitor notifications (leave empty to disable)
   discord_webhook: ""
 
-  # Optional tag shown by backend if you use XAseco slash sender
+  Optional tag shown by backend if you use XAseco slash sender
   xaseco_slash_sender: ""
 
-  # Global superadmins (Discord user IDs as strings)
+  Global superadmins (Discord user IDs as strings)
   admin_discord_ids: []
 
-  # Per-group instance admins (Discord user IDs)
+  Per-group instance admins (Discord user IDs)
   group_admins: {}
 
-  # Optional: who can SEE which groups (not admin rights)
+  Optional: who can SEE which groups (not admin rights)
   user_groups: {}
 
-  # ----- Monitor settings -----
+  ----- Monitor settings -----
   monitor_refresh_seconds: 300
   monitor_state_file: "./monitor-flags.json"
 
-  # ----- Trakman policy -----
+  ----- Trakman policy -----
   trakman_restart_hours: 27
   trakman_player_check_minutes: 15
 
@@ -157,35 +158,35 @@ settings:
 php56: "C:\\xampp\\php56\\php.exe"
 
 instances:
-  # --------- Example Trakman controller ----------
+  --------- Example Trakman controller ----------
   - name: "Trakman_RPG"
     group: "group-a"
     type: "trakman"
 
-    # Server process detection & start
+    Server process detection & start
     server_proc_name: "ExampleServer.exe"
     server_bat: "C:\\path\\to\\server\\StartServer.bat"
 
-    # Trakman (pm2) controller
+    Trakman (pm2) controller
     trakman_dir: "C:\\path\\to\\trakman"
     pm2_name: "Trakman_RPG"
 
-    # Logs (optional but recommended)
+    Logs (optional but recommended)
     server_log: "C:\\path\\to\\server\\Logs\\GameLog.txt"
     controller_log: "C:\\path\\to\\trakman\\logs\\combined.log"
 
-    # Dedicated server XML-RPC
+    Dedicated server XML-RPC
     xmlrpc_host: "127.0.0.1"
     xmlrpc_port: 5000
     xmlrpc_login: "SuperAdmin"
     xmlrpc_password: "CHANGE_ME"
     xmlrpc_path: "/RPC2"
 
-    # Monitoring policy
+    Monitoring policy
     restart_after_hours: 27
     player_check_minutes: 15
 
-    # Graceful restart sequence (Trakman)
+    Graceful restart sequence (Trakman)
     restart_pre_commands:
       - "//svms"
       - "//s"
@@ -195,7 +196,7 @@ instances:
     restart_post_commands:
       - "//kc"
 
-  # --------- Example XAseco controller ----------
+  --------- Example XAseco controller ----------
   - name: "XAseco_RPG"
     group: "group-b"
     type: "xaseco"
@@ -203,7 +204,7 @@ instances:
     server_proc_name: "ExampleXAseco.exe"
     server_bat: "C:\\path\\to\\xaseco\\Start.bat"
 
-    # XAseco location and launch name
+    XAseco location and launch name
     xaseco_dir: "C:\\path\\to\\xaseco"
     xaseco_name: "XAseco_RPG"
 
@@ -219,7 +220,7 @@ instances:
     restart_after_hours: 27
     player_check_minutes: 15
 
-    # Graceful restart sequence (XAseco)
+    Graceful restart sequence (XAseco)
     restart_chat_pre:
       - "/admin writetracklist"
       - "/admin writeabilities"
