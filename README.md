@@ -71,7 +71,7 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 
 ---
 
-# XAaseco Fix
+# XAseco Fix
 - To implement & inject server login as MasterAdmin (plugins/plugin.server_admin_bridge.php) to XAseco for use via XML-RPC chatSend method
 - Add server login into "xaseco/config.xml" as MasterAdmin
 - For manual fix, check below (else download xaseco-patch.zip)
