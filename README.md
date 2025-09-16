@@ -15,6 +15,7 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 - [Features](#features)
 - [Tested With](#tested-with)
 - [Prerequisites](#prerequisites)
+- [XAseco Fix](#xaseco-fix)
 - [Folder Layout](#folder-layout)
 - [Installation](#installation)
 - [Configuration](#configuration)
@@ -68,6 +69,181 @@ Includes Discord OAuth login, per-group admin permissions, live log streaming ov
 - **PHP 5.6** (for XAseco): https://windows.php.net/downloads/releases/archives/php-5.6.9-Win32-VC11-x64.zip
 - **Python 3.12.x**: https://www.python.org/downloads/
 
+---
+
+# XAaseco Fix
+- To implement & inject server login as MasterAdmin (plugins/plugin.server_admin_bridge.php) to XAseco for use via XML-RPC chatSend method
+- Add server login into "xaseco/config.xml" as MasterAdmin
+- For manual fix, check below (else download xaseco-patch.zip)
+```
+## Fix 1 - playerChat - aseco.php
+	/**
+	 * Receives chat messages and reacts on them.
+	 * Reactions are done by the chat plugins.
+	 */
+	function playerChat($chat) {
+
+		// verify login
+		if ($chat[1] == '' || $chat[1] == '???') {
+			trigger_error('playerUid ' . $chat[0] . 'has login [' . $chat[1] . ']!', E_USER_WARNING);
+			$this->console('playerUid {1} attempted to use chat command "{2}"',
+			               $chat[0], $chat[2]);
+			return;
+		}
+
+		// ignore master server messages on relay
+		if ($this->server->isrelay && $chat[1] == $this->server->relaymaster['Login'])
+			return;
+
+		// check for chat command '/' prefix
+		$command = $chat[2];
+		if ($command != '' && $command[0] == '/') {
+			// remove '/' prefix
+			$command = substr($command, 1);
+
+			// split strings at spaces and add them into an array
+			$params = explode(' ', $command, 2);
+			$translated_name = str_replace('+', 'plus', $params[0]);
+			$translated_name = str_replace('-', 'dash', $translated_name);
+
+			// check if the function and the command exist
+			if (function_exists('chat_' . $translated_name)) {
+				// insure parameter exists & is trimmed
+				if (isset($params[1]))
+					$params[1] = trim($params[1]);
+				else
+					$params[1] = '';
+
+				// get & verify player object (or fabricate for server login)
+				$author = $this->server->players->getPlayer($chat[1]);
+				
+				if ((!$author || $author->login == '') &&
+					isset($this->server->serverlogin) &&
+					strcasecmp($chat[1], $this->server->serverlogin) === 0 &&
+					$chat[0] == $this->server->id) {
+					// Create a temporary "synthetic" author ONLY for this chat command.
+					$author = new Player();
+					$author->pid         = isset($this->server->id) ? intval($this->server->id) : 0; // TMF PlayerId
+					$author->id          = 0;            // DB id (none) – keep 0 to avoid DB side-effects
+					$author->login       = $this->server->serverlogin;
+					$author->nickname    = isset($this->server->nickname) ? $this->server->nickname : $this->server->serverlogin;
+					// If your masteradmin entry has an IP restriction, set this to a matching IP:
+					$author->ip          = $this->server->ip ?: '127.0.0.1';
+					$author->isspectator = true;
+					$author->unlocked    = true; // bypass lock password checks
+					$author->rights      = 3;    // informational only; allowAbility() uses admin lists
+				}
+				
+				// proceed if we have an author now
+				if ($author && $author->login != '') {
+					// log console message
+					$this->console('player {1} used chat command "/{2} {3}"',
+								$chat[1], $params[0], $params[1]);
+				
+					// save circumstances in array
+					$chat_command = array();
+					$chat_command['author'] = $author;
+					$chat_command['params'] = $params[1];
+				
+					// call the function which belongs to the command
+					call_user_func('chat_' . $translated_name, $this, $chat_command);
+				} else {
+					trigger_error('Player object for \'' . $chat[1] . '\' not found!', E_USER_WARNING);
+					$this->console('player {1} attempted to use chat command "/{2} {3}"',
+								$chat[1], $params[0], $params[1]);
+				}
+			} elseif ($params[0] == 'version' ||
+			          ($params[0] == 'serverlogin' && $this->server->getGame() == 'TMF')) {
+				// log built-in commands
+				$this->console('player {1} used built-in command "/{2}"',
+				               $chat[1], $command);
+			} else {
+				// optionally log bogus chat commands too
+				if ($this->settings['log_all_chat']) {
+					if ($chat[0] != $this->server->id) {
+						$this->console('({1}) {2}', $chat[1], stripColors($chat[2], false));
+					}
+				}
+			}
+		} else {
+			// optionally log all normal chat too
+			if ($this->settings['log_all_chat']) {
+				if ($chat[0] != $this->server->id && $chat[2] != '') {
+					$this->console('({1}) {2}', $chat[1], stripColors($chat[2], false));
+				}
+			}
+		}
+	}  // playerChat
+
+## Fix 2 - playerConnect - aseco.php
+	function playerConnect($player) {
+	
+		// request information about the new player
+		// (removed callback mechanism here, as GetPlayerInfo occasionally
+		//  returns no data and then the connecting login would be lost)
+		$login = $player[0];
+	
+		// NEVER treat the dedicated account as a real player (TMF only)
+		if ($this->server->getGame() == 'TMF' &&
+			isset($this->server->serverlogin) &&
+			strcasecmp($login, $this->server->serverlogin) === 0) {
+			return;
+		}
+	
+		if ($this->server->getGame() == 'TMF') {
+			$this->client->query('GetDetailedPlayerInfo', $login);
+			$playerd = $this->client->getResponse();
+			$this->client->query('GetPlayerInfo', $login, 1);
+		} else {  // TMN/TMS/TMO
+			$this->client->query('GetPlayerInfo', $login);
+		}
+		$player = $this->client->getResponse();
+
+## Fix 3 - serverSync - aseco.php
+		// update players/relays lists
+		if (!empty($response['playerlist'])) {
+			foreach ($response['playerlist'] as $player) {
+				$login = $player['Login'];
+				if ($this->server->getGame() == 'TMF' &&
+					isset($this->server->serverlogin) &&
+					strcasecmp($login, $this->server->serverlogin) === 0) {
+					continue; // don’t seed the dedicated account
+				}
+				$this->playerConnect(array($login, ''));
+			}
+		}
+	}  // serverSync
+
+## Fix 4 - re_calculateClock - plugin.records_eyepiece.php
+function re_calculateClock ($timezone) {
+    global $re_config;
+
+    // Resolve desired timezone with safe fallbacks
+    $tzWant = trim((string)$timezone);
+    if ($tzWant === '') {
+        $tzWant = isset($re_config['CLOCK_WIDGET'][0]['TIMEZONE'][0])
+            ? (string)$re_config['CLOCK_WIDGET'][0]['TIMEZONE'][0]
+            : '';
+        if ($tzWant === '') {
+            $tzWant = ini_get('date.timezone') ?: date_default_timezone_get() ?: 'UTC';
+        }
+    }
+    try { $zoneWant = new DateTimeZone($tzWant); }
+    catch (Exception $e) { $zoneWant = new DateTimeZone('UTC'); $tzWant = 'UTC'; }
+
+    // TIMEFORMAT fallback
+    $fmt = (!empty($re_config['CLOCK_WIDGET'][0]['TIMEFORMAT'][0]))
+        ? (string)$re_config['CLOCK_WIDGET'][0]['TIMEFORMAT'][0]
+        : 'H:i';
+
+    $now   = new DateTime('now', $zoneWant);
+    $time  = $now->format($fmt);
+    $abbr  = $now->format('T');   // wanted timezone’s abbreviation
+
+    return array('timeformat' => $time, 'timezone' => $abbr);
+}
+
+```
 ---
 
 # Folder Layout
